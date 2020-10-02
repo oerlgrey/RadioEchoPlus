@@ -1,0 +1,9 @@
+Package: enigma2-plugin-extensions-radioechoplus
+Version: 1.0
+Section: misc
+Priority: optional
+Architecture: all
+Depends: python-subprocess, python-requests
+Maintainer: örlgrey
+Description: Radio ECHOPLUS Player
+Source:

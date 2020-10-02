@@ -1,0 +1,13 @@
+#!/bin/sh
+if [ -f /usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/__init__.pyo ]; then
+    rm /usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/__init__.pyo
+fi
+if [ -f /usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/RadioEchoPlus.pyo ]; then
+    rm /usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/RadioEchoPlus.pyo
+fi
+if [ -f /usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/ping.pyo ]; then
+    rm /usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/ping.pyo
+fi
+if [ -f /usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/plugin.pyo ]; then
+    rm /usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/plugin.pyo
+fi
