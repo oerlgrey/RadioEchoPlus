@@ -22,7 +22,7 @@ from Components.AVSwitch import AVSwitch
 from Components.Sources.StaticText import StaticText
 from Components.Pixmap import Pixmap
 from Components.Label import Label
-from enigma import eServiceReference, iServiceInformation, ePoint, eTimer, ePicLoad
+from enigma import eServiceReference, iServiceInformation, eTimer, ePicLoad
 import time, json, urllib, subprocess, requests
 from Tools.Directories import fileExists
 
@@ -88,8 +88,8 @@ class RadioEchoPlus(Screen):
 		self.abouttimer = eTimer()
 		self.abouttimer.callback.append(self.showAbout)
 		self.infotimer = eTimer()
-		self.infotimer.callback.append(self.getSongTitle)
-		self.onLayoutFinish.append(self.getSongTitle)
+		self.infotimer.callback.append(self.getInfos)
+		self.onLayoutFinish.append(self.getInfos)
 		self.InternetAvailable = self.getInternetAvailable()
 		self.play()
 		self.UpdatePicture()
@@ -106,9 +106,11 @@ class RadioEchoPlus(Screen):
 		except:
 			self.close()
 
-	def getSongTitle(self):
+	def getInfos(self):
+		global songtitle, exitstate, screenchange
 		self.infotimer.start(1000, True)
-		global songtitle, screenchange, exitstate
+
+		# activate timer (mainscreen -> about)
 		if exitstate == "quit":
 			exitstate = ""
 			if self.abouttimer.isActive():
@@ -117,24 +119,28 @@ class RadioEchoPlus(Screen):
 		if screenchange == "waiting":
 			screenchange = "running"
 			self.abouttimer.start(15000, True)
+
+		# get songtitle
 		song = self.session.nav.getCurrentService()
 		songtitle = song.info().getInfoString(iServiceInformation.sTagTitle)
+
+		# set songtitle
 		if songtitle == " - WERBUNG":
 			songtitle = "Radio ECHOPLUS Werbung"
-		if songtitle in (" - Radio ECHOPLUS"," - Radio ECHOPLUS2"," - Radio ECHOPLUS3"," - 70igerECHOPLUS"," - www.Radio Echoplus"):
-			songtitle = "Radio ECHOPLUS"
+		elif songtitle in (" - Radio ECHOPLUS"," - Radio ECHOPLUS2"," - Radio ECHOPLUS3"," - 70igerECHOPLUS"," - www.Radio Echoplus"):
+			songtitle = "Radio ECHOPLUS Info"
 		self["songtitle"].setText(songtitle)
-		if not songtitle == '':
-			if songtitle != self.oldSongTitle:
-				print "Radio ECHOPLUS plays: " + songtitle
-				self.getCover()
+
+		# get cover if new songtitle found
+		if songtitle != self.oldSongTitle:
+			print "Radio ECHOPLUS plays: " + songtitle
+			self.getCover()
 
 	def getCover(self):
 		global songtitle, coverpath
-		if songtitle in ("Radio ECHOPLUS Werbung","Radio ECHOPLUS"):
+		if songtitle in ("Radio ECHOPLUS Werbung","Radio ECHOPLUS Info"):
 			print "Radio ECHOPLUS no cover download necessary"
 			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/echoplus_RADIO.jpg"
-			self.covertimer.start(100, True)
 		else:
 			try:
 				res = requests.get("http://itunes.apple.com/search?term=%s&limit=1&media=music" % (urllib.quote_plus(songtitle)), timeout=1)
@@ -146,9 +152,8 @@ class RadioEchoPlus(Screen):
 				print "Radio ECHOPLUS cover download successful"
 				coverpath = "/tmp/echoplus_cover.jpg"
 			except:
-				print "Radio ECHOPLUS cover download failed"
 				self.tryDownloadAgain()
-			self.covertimer.start(100, True)
+		self.covertimer.start(200, True)
 		self.oldSongTitle = songtitle
 
 	def tryDownloadAgain(self):
@@ -262,7 +267,7 @@ class RadioEchoPlusAbout(Screen):
 		}, -2)
 
 		self["key_red"] = StaticText(_("Exit"))
-		self["Title"] = StaticText(_("About Radio ECHOPLUS"))
+		self["Title"] = StaticText(_("Radio ECHOPLUS"))
 		self["songtitle"] = StaticText()
 
 		self.exittimer = eTimer()

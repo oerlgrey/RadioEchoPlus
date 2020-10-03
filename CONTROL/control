@@ -4,6 +4,6 @@ Section: misc
 Priority: optional
 Architecture: all
 Depends: python-subprocess, python-requests
-Maintainer: örlgrey
+Maintainer: oerlgrey
 Description: Radio ECHOPLUS Player
 Source:
