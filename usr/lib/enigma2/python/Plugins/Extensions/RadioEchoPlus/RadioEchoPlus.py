@@ -24,7 +24,6 @@ from Components.Pixmap import Pixmap
 from Components.Label import Label
 from enigma import eServiceReference, iServiceInformation, eTimer, ePicLoad
 import time, json, urllib, subprocess, requests
-from Tools.Directories import fileExists
 
 coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/echoplus_RADIO.jpg"
 songtitle = ''
@@ -81,18 +80,17 @@ class RadioEchoPlus(Screen):
 		}, -2)
 
 		self["key_red"] = StaticText(_("Exit"))
-		self["Title"] = StaticText(_("Radio ECHOPLUS"))
+		self["Title"] = StaticText("Radio ECHOPLUS")
 		self["songtitle"] = StaticText()
 
+		self.infotimer = eTimer()
+		self.infotimer.callback.append(self.getInfos)
 		self.covertimer = eTimer()
 		self.abouttimer = eTimer()
 		self.abouttimer.callback.append(self.showAbout)
-		self.infotimer = eTimer()
-		self.infotimer.callback.append(self.getInfos)
-		self.onLayoutFinish.append(self.getInfos)
 		self.InternetAvailable = self.getInternetAvailable()
 		self.play()
-		self.UpdatePicture()
+		self.updatePicture()
 
 	def play(self):
 		try:
@@ -101,6 +99,7 @@ class RadioEchoPlus(Screen):
 				URL = "4097:0:0:0:0:0:0:0:0:0:http%3a//radio2.stream24.net%3a9120/live.mp3"
 				stream = eServiceReference(URL)
 				self.session.nav.playService(stream)
+				self.infotimer.start(2000, True)
 			else:
 				self.close()
 		except:
@@ -108,7 +107,7 @@ class RadioEchoPlus(Screen):
 
 	def getInfos(self):
 		global songtitle, exitstate, screenchange
-		self.infotimer.start(1000, True)
+		self.infotimer.stop()
 
 		# activate timer (mainscreen -> about)
 		if exitstate == "quit":
@@ -126,9 +125,15 @@ class RadioEchoPlus(Screen):
 
 		# set songtitle
 		if songtitle == " - WERBUNG":
-			songtitle = "Radio ECHOPLUS Werbung"
+			songtitle = "Radio ECHOPLUS - Werbung"
 		elif songtitle in (" - Radio ECHOPLUS"," - Radio ECHOPLUS2"," - Radio ECHOPLUS3"," - 70igerECHOPLUS"," - www.Radio Echoplus"):
-			songtitle = "Radio ECHOPLUS Info"
+			songtitle = "Radio ECHOPLUS - Info"
+		elif songtitle == " - 70igerECHOPLUS":
+			songtitle = "Radio ECHOPLUS - 70iger"
+		elif songtitle == " - OLDIES":
+			songtitle = "Radio ECHOPLUS - Oldies"
+		elif songtitle == "":
+			songtitle = "kein Songtitel gefunden"
 		self["songtitle"].setText(songtitle)
 
 		# get cover if new songtitle found
@@ -136,9 +141,12 @@ class RadioEchoPlus(Screen):
 			print "Radio ECHOPLUS plays: " + songtitle
 			self.getCover()
 
+		# repeat self.getInfos every two seconds
+		self.infotimer.start(2000, True)
+
 	def getCover(self):
 		global songtitle, coverpath
-		if songtitle in ("Radio ECHOPLUS Werbung","Radio ECHOPLUS Info"):
+		if songtitle in ("kein Songtitel gefunden","Radio ECHOPLUS - Werbung","Radio ECHOPLUS - Info","Radio ECHOPLUS - 70iger","Radio ECHOPLUS - Oldies"):
 			print "Radio ECHOPLUS no cover download necessary"
 			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/echoplus_RADIO.jpg"
 		else:
@@ -171,17 +179,17 @@ class RadioEchoPlus(Screen):
 			print "Radio ECHOPLUS cover download failed"
 			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/echoplus_RADIO.jpg"
 
-	def UpdatePicture(self):
-		self.PicLoad.PictureData.get().append(self.DecodePicture)
-		self.covertimer.callback.append(self.ShowPicture)
+	def updatePicture(self):
+		self.PicLoad.PictureData.get().append(self.decodePicture)
+		self.covertimer.callback.append(self.showPicture)
 
-	def ShowPicture(self):
+	def showPicture(self):
 		global coverpath
 		self.PicLoad.setPara([self["cover"].instance.size().width(),self["cover"].instance.size().height(),self.Scale[0],self.Scale[1],0,1,"#00000000"])
 		self.PicLoad.startDecode(coverpath)
 		self.covertimer.stop()
 
-	def DecodePicture(self, PicInfo = ""):
+	def decodePicture(self, PicInfo = ""):
 		ptr = self.PicLoad.getData()
 		self["cover"].instance.setPixmap(ptr)
 
@@ -197,7 +205,8 @@ class RadioEchoPlus(Screen):
 		if answer is True:
 			if self.covertimer.isActive():
 				self.covertimer.stop()
-			self.infotimer.stop()
+			if self.infotimer.isActive():
+				self.infotimer.stop()
 			self.close()
 			self.session.nav.playService(self.oldService)
 		else:
@@ -267,7 +276,7 @@ class RadioEchoPlusAbout(Screen):
 		}, -2)
 
 		self["key_red"] = StaticText(_("Exit"))
-		self["Title"] = StaticText(_("Radio ECHOPLUS"))
+		self["Title"] = StaticText("Über Radio ECHOPLUS")
 		self["songtitle"] = StaticText()
 
 		self.exittimer = eTimer()
