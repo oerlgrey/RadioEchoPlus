@@ -23,7 +23,7 @@ from Components.Sources.StaticText import StaticText
 from Components.Pixmap import Pixmap
 from Components.Label import Label
 from enigma import eServiceReference, iServiceInformation, eTimer, ePicLoad
-import time, json, urllib, subprocess, requests
+import time, os, json, urllib, subprocess, requests
 
 coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/echoplus_RADIO.jpg"
 songtitle = ''
@@ -126,19 +126,22 @@ class RadioEchoPlus(Screen):
 		# set songtitle
 		if songtitle == " - WERBUNG":
 			songtitle = "Radio ECHOPLUS - Werbung"
-		elif songtitle in (" - Radio ECHOPLUS"," - Radio ECHOPLUS2"," - Radio ECHOPLUS3"," - 70igerECHOPLUS"," - www.Radio Echoplus"):
+		elif songtitle in (" - Radio ECHOPLUS"," - Radio ECHOPLUS2"," - Radio ECHOPLUS3"," - www.Radio Echoplus"):
 			songtitle = "Radio ECHOPLUS - Info"
 		elif songtitle == " - 70igerECHOPLUS":
 			songtitle = "Radio ECHOPLUS - 70iger"
 		elif songtitle == " - OLDIES":
 			songtitle = "Radio ECHOPLUS - Oldies"
+		elif songtitle == " - WILHELMMULTIMEDIA":
+			songtitle = "Radio ECHOPLUS - WilhemMultimedia"
+		elif songtitle == " - NACHRICHTEN":
+			songtitle = "Radio ECHOPLUS - Nachrichten"
 		elif songtitle == "":
 			songtitle = "kein Songtitel gefunden"
 		self["songtitle"].setText(songtitle)
 
 		# get cover if new songtitle found
 		if songtitle != self.oldSongTitle:
-			print "Radio ECHOPLUS plays: " + songtitle
 			self.getCover()
 
 		# repeat self.getInfos every two seconds
@@ -146,9 +149,20 @@ class RadioEchoPlus(Screen):
 
 	def getCover(self):
 		global songtitle, coverpath
-		if songtitle in ("kein Songtitel gefunden","Radio ECHOPLUS - Werbung","Radio ECHOPLUS - Info","Radio ECHOPLUS - 70iger","Radio ECHOPLUS - Oldies"):
-			print "Radio ECHOPLUS no cover download necessary"
+		if songtitle == "kein Songtitel gefunden":
 			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/echoplus_RADIO.jpg"
+		elif songtitle == "Radio ECHOPLUS - Werbung":
+			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/Werbung.jpg"
+		elif songtitle == "Radio ECHOPLUS - Info":
+			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/Info.jpg"
+		elif songtitle == "Radio ECHOPLUS - 70iger":
+			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/70iger.jpg"
+		elif songtitle == "Radio ECHOPLUS - Oldies":
+			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/Oldies.jpg"
+		elif songtitle == "Radio ECHOPLUS - WilhemMultimedia":
+			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/WilhemMultimedia.jpg"
+		elif songtitle == "Radio ECHOPLUS - Nachrichten":
+			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/Nachrichten.jpg"
 		else:
 			try:
 				res = requests.get("http://itunes.apple.com/search?term=%s&limit=1&media=music" % (urllib.quote_plus(songtitle)), timeout=1)
@@ -157,8 +171,10 @@ class RadioEchoPlus(Screen):
 				url = url.replace('100x100', '450x450').replace('https', 'http')
 				sub = subprocess.Popen("wget -q " + url + " -O /tmp/echoplus_cover.jpg", shell = True)
 				sub.wait()
-				print "Radio ECHOPLUS cover download successful"
-				coverpath = "/tmp/echoplus_cover.jpg"
+				if os.path.getsize("/tmp/echoplus_cover.jpg") == 0:
+					coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/echoplus_RADIO.jpg"
+				else:
+					coverpath = "/tmp/echoplus_cover.jpg"
 			except:
 				self.tryDownloadAgain()
 		self.covertimer.start(200, True)
@@ -173,10 +189,11 @@ class RadioEchoPlus(Screen):
 			url = url.replace('100x100', '300x300').replace('https', 'http')
 			sub = subprocess.Popen("wget -q " + url + " -O /tmp/echoplus_cover.jpg", shell = True)
 			sub.wait()
-			print "Radio ECHOPLUS cover download successful"
-			coverpath = "/tmp/echoplus_cover.jpg"
+			if os.path.getsize("/tmp/echoplus_cover.jpg") == 0:
+				coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/echoplus_RADIO.jpg"
+			else:
+				coverpath = "/tmp/echoplus_cover.jpg"
 		except:
-			print "Radio ECHOPLUS cover download failed"
 			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/echoplus_RADIO.jpg"
 
 	def updatePicture(self):
@@ -207,8 +224,9 @@ class RadioEchoPlus(Screen):
 				self.covertimer.stop()
 			if self.infotimer.isActive():
 				self.infotimer.stop()
-			self.close()
+			self.session.nav.stopService()
 			self.session.nav.playService(self.oldService)
+			self.close()
 		else:
 			global exitstate, screenchange
 			exitstate = "running"
