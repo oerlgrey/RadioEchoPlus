@@ -30,7 +30,6 @@ from shutil import move
 coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/echoplus_RADIO.jpg"
 songtitle = ''
 screenchange = "waiting"
-exitstate = "running"
 
 class RadioEchoPlus(Screen):
 	skin = """
@@ -116,12 +115,7 @@ class RadioEchoPlus(Screen):
 		self.infotimer.start(2000, True)
 
 	def startAboutSwitchTimer(self):
-		global exitstate, screenchange
-		if exitstate == "quit":
-			exitstate = ""
-			if self.abouttimer.isActive():
-				self.abouttimer.stop()
-			self.exit()
+		global screenchange
 		if screenchange == "waiting":
 			screenchange = "running"
 			self.abouttimer.start(15000, True)
@@ -230,6 +224,10 @@ class RadioEchoPlus(Screen):
 		self.session.open(RadioEchoPlusAbout)
 
 	def exit(self):
+		global screenchange
+		screenchange = ""
+		if self.abouttimer.isActive():
+			self.abouttimer.stop()
 		askExit = self.session.openWithCallback(self.doExit,MessageBox,_("Do you really want to exit?"), MessageBox.TYPE_YESNO)
 		askExit.setTitle(_("Exit"))
 
@@ -243,8 +241,7 @@ class RadioEchoPlus(Screen):
 			self.session.nav.playService(self.oldService)
 			self.close()
 		else:
-			global exitstate, screenchange
-			exitstate = "running"
+			global screenchange
 			screenchange = "waiting"
 			pass
 
@@ -304,11 +301,11 @@ class RadioEchoPlusAbout(Screen):
 
 		self["actions"] = ActionMap(["OkCancelActions","ColorActions"],
 		{
-			"red": self.exit,
-			"cancel": self.exit
+			"red": self.hideAbout,
+			"cancel": self.hideAbout
 		}, -2)
 
-		self["key_red"] = StaticText(_("Exit"))
+		self["key_red"] = StaticText(_("Back"))
 		self["Title"] = StaticText("Über Radio ECHOPLUS")
 		self["songtitle"] = StaticText()
 
@@ -332,11 +329,5 @@ class RadioEchoPlusAbout(Screen):
 		global screenchange
 		screenchange = "waiting"
 		self.exittimer.stop()
-		self.infotimer.stop()
-		self.close()
-
-	def exit(self):
-		global exitstate
-		exitstate = "quit"
 		self.infotimer.stop()
 		self.close()
