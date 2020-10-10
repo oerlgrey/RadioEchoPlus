@@ -23,7 +23,9 @@ from Components.Sources.StaticText import StaticText
 from Components.Pixmap import Pixmap
 from Components.Label import Label
 from enigma import eServiceReference, iServiceInformation, eTimer, ePicLoad
-import time, os, json, urllib, subprocess, requests
+import time, os, json, urllib, urllib2, subprocess, requests
+from Tools.Directories import fileExists
+from shutil import move
 
 coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/echoplus_RADIO.jpg"
 songtitle = ''
@@ -106,10 +108,15 @@ class RadioEchoPlus(Screen):
 			self.close()
 
 	def getInfos(self):
-		global songtitle, exitstate, screenchange
 		self.infotimer.stop()
+		self.startAboutSwitchTimer()
+		self.getSongTitle()
+		self.changeSongTitle()
+		self.checkNewSongTitle()
+		self.infotimer.start(2000, True)
 
-		# activate timer (mainscreen -> about)
+	def startAboutSwitchTimer(self):
+		global exitstate, screenchange
 		if exitstate == "quit":
 			exitstate = ""
 			if self.abouttimer.isActive():
@@ -119,37 +126,48 @@ class RadioEchoPlus(Screen):
 			screenchange = "running"
 			self.abouttimer.start(15000, True)
 
-		# get songtitle
-		song = self.session.nav.getCurrentService()
-		songtitle = song.info().getInfoString(iServiceInformation.sTagTitle)
+	def getSongTitle(self):
+		global songtitle
+		url = "http://radio2.stream24.net:9120/live.mp3"
+		request = urllib2.Request(url)
+		try:
+			request.add_header("Icy-MetaData", 1)
+			response = urllib2.urlopen(request)
+			icy_metaint_header = response.headers.get("icy-metaint")
+			if icy_metaint_header is not None:
+				metaint = int(icy_metaint_header)
+				read_buffer = metaint + 255
+				content = response.read(read_buffer)
+				title = content[metaint:].replace("StreamTitle='", "MetaDataTitle").replace("';", "MetaDataTitle").decode("latin-1").encode("utf-8")
+				songtitle = str(title.split("MetaDataTitle")[1])
+			else:
+				songtitle = "Radio ECHOPLUS - kein Songtitel gefunden"
+		except:
+			songtitle = "Radio ECHOPLUS - kein Songtitel gefunden"
 
-		# set songtitle
+	def changeSongTitle(self):
+		global songtitle
 		if songtitle == " - WERBUNG":
 			songtitle = "Radio ECHOPLUS - Werbung"
-		elif songtitle in (" - Radio ECHOPLUS"," - Radio ECHOPLUS2"," - Radio ECHOPLUS3"," - www.Radio Echoplus"):
+		if songtitle in (" - Radio ECHOPLUS"," - Radio ECHOPLUS2"," - Radio ECHOPLUS3"," - www.Radio Echoplus"):
 			songtitle = "Radio ECHOPLUS - Info"
-		elif songtitle == " - 70igerECHOPLUS":
+		if songtitle == " - 70igerECHOPLUS":
 			songtitle = "Radio ECHOPLUS - 70iger"
-		elif songtitle == " - OLDIES":
+		if songtitle == " - OLDIES":
 			songtitle = "Radio ECHOPLUS - Oldies"
-		elif songtitle == " - WILHELMMULTIMEDIA":
-			songtitle = "Radio ECHOPLUS - WilhemMultimedia"
-		elif songtitle == " - NACHRICHTEN":
+		if songtitle == " - NACHRICHTEN":
 			songtitle = "Radio ECHOPLUS - Nachrichten"
-		elif songtitle == "":
-			songtitle = "kein Songtitel gefunden"
-		self["songtitle"].setText(songtitle)
 
-		# get cover if new songtitle found
+	def checkNewSongTitle(self):
+		global songtitle
 		if songtitle != self.oldSongTitle:
+			print "RadioEchoPlus: playing ... " + songtitle
+			self["songtitle"].setText(songtitle)
 			self.getCover()
-
-		# repeat self.getInfos every two seconds
-		self.infotimer.start(2000, True)
 
 	def getCover(self):
 		global songtitle, coverpath
-		if songtitle == "kein Songtitel gefunden":
+		if songtitle == "Radio ECHOPLUS - kein Songtitel gefunden":
 			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/echoplus_RADIO.jpg"
 		elif songtitle == "Radio ECHOPLUS - Werbung":
 			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/Werbung.jpg"
@@ -159,20 +177,13 @@ class RadioEchoPlus(Screen):
 			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/70iger.jpg"
 		elif songtitle == "Radio ECHOPLUS - Oldies":
 			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/Oldies.jpg"
-		elif songtitle == "Radio ECHOPLUS - WilhemMultimedia":
-			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/WilhemMultimedia.jpg"
 		elif songtitle == "Radio ECHOPLUS - Nachrichten":
 			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/Nachrichten.jpg"
 		else:
 			try:
-				res = requests.get("http://itunes.apple.com/search?term=%s&limit=1&media=music" % (urllib.quote_plus(songtitle)), timeout=1)
-				data = res.json()
-				url = data['results'][0]['artworkUrl100'].encode('utf-8')
-				url = url.replace('100x100', '450x450').replace('https', 'http')
-				sub = subprocess.Popen("wget -q " + url + " -O /tmp/echoplus_cover.jpg", shell = True)
-				sub.wait()
+				self.downloadCover("450x450")
 				if os.path.getsize("/tmp/echoplus_cover.jpg") == 0:
-					coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/echoplus_RADIO.jpg"
+					self.tryDownloadAgain()
 				else:
 					coverpath = "/tmp/echoplus_cover.jpg"
 			except:
@@ -181,20 +192,24 @@ class RadioEchoPlus(Screen):
 		self.oldSongTitle = songtitle
 
 	def tryDownloadAgain(self):
-		global songtitle, coverpath
+		global coverpath
 		try:
-			res = requests.get("http://itunes.apple.com/search?term=%s&limit=1&media=music" % (urllib.quote_plus(songtitle)), timeout=1)
-			data = res.json()
-			url = data['results'][0]['artworkUrl100'].encode('utf-8')
-			url = url.replace('100x100', '300x300').replace('https', 'http')
-			sub = subprocess.Popen("wget -q " + url + " -O /tmp/echoplus_cover.jpg", shell = True)
-			sub.wait()
+			self.downloadCover("300x300")
 			if os.path.getsize("/tmp/echoplus_cover.jpg") == 0:
 				coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/echoplus_RADIO.jpg"
 			else:
 				coverpath = "/tmp/echoplus_cover.jpg"
 		except:
 			coverpath = "/usr/lib/enigma2/python/Plugins/Extensions/RadioEchoPlus/graphics/echoplus_RADIO.jpg"
+
+	def downloadCover(self, resolution):
+		global songtitle
+		res = requests.get("http://itunes.apple.com/search?term=%s&limit=1&media=music" % (urllib.quote_plus(songtitle)), timeout=1)
+		data = res.json()
+		url = data['results'][0]['artworkUrl100'].encode('utf-8')
+		url = url.replace("100x100", resolution).replace('https', 'http')
+		sub = subprocess.Popen("wget -q " + url + " -O /tmp/echoplus_cover.jpg", shell = True)
+		sub.wait()
 
 	def updatePicture(self):
 		self.PicLoad.PictureData.get().append(self.decodePicture)
